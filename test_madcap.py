@@ -14,6 +14,8 @@ from .toc import (
     _looks_like_topic_path,
 )
 from .converter import (
+    ImageProcessingState,
+    convert_topic_body,
     preclean_html_text,
     _replace_with_text,
     rewrite_xrefs,
@@ -130,6 +132,40 @@ class TestMadCapConverter(unittest.TestCase):
         self.assertEqual(links[1].attributes.get("href"), "http://google.com")
         # Verify body text still contains all text
         self.assertIn("Missing", body.text())
+
+    def test_convert_topic_body_strips_code_snippet_toolbar_and_line_numbers(self):
+        import tempfile
+
+        html = """<!DOCTYPE html>
+<html><body><div id="mc-main-content">
+    <h1>Topic Title</h1>
+    <div class="Example">
+        <div class="codeSnippet">
+            <a class="codeSnippetCopyButton" role="button" href="javascript:void(0);">Copy</a>
+            <div class="codeSnippetCaption">Example</div>
+            <div class="codeSnippetBody" data-mc-continue="False" data-mc-line-number-start="1" data-mc-use-line-numbers="True"><pre><span class="codeSnippetLineNumbers" style="border-right: #AAA 2px solid;" aria-hidden="true">1
+2
+3
+4
+</span><code>&#160;&#160;&#160;&#160;public class ExampleApi<br />&#160;&#160;&#160;&#160;{<br />&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;public void Build() { }<br />&#160;&#160;&#160;&#160;}</code></pre>
+            </div>
+        </div>
+    </div>
+</div></body></html>"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            topic = root / "Sources" / "Topic.htm"
+            topic.parent.mkdir(parents=True, exist_ok=True)
+            topic.write_text(html, encoding="utf-8")
+
+            md = convert_topic_body(topic, root, {}, ImageProcessingState(), "strip")
+            self.assertNotIn("Copy", md)
+            self.assertNotIn("1\n2", md)
+            self.assertNotIn("\u00a0", md)
+            self.assertEqual(
+                md,
+                "Example\n\n```\npublic class ExampleApi\n{\n    public void Build() { }\n}\n```",
+            )
 
 class TestMarkdownValidation(unittest.TestCase):
     def test_validate_markdown_syntax_valid(self):

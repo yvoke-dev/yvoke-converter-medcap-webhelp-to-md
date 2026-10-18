@@ -14,6 +14,9 @@ STRIP_SELECTORS = [
     ".MCBreadcrumbsBox_0",
     ".breadcrumbs",
     ".nocontent",
+    # MadCap code snippet toolbar ("Copy" button) and line-number gutter
+    "a.codeSnippetCopyButton",
+    "span.codeSnippetLineNumbers",
     # Inline icon images with no alt text
     "img.Icon",
 ]

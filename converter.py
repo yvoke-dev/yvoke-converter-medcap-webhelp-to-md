@@ -214,6 +214,15 @@ def _classes(el) -> list[str]:
 
 class FlareMarkdownConverter(MarkdownConverter):
     """markdownify converter tuned for MadCap Flare quirks."""
+    def convert_pre(self, el, text, parent_tags):
+        lines = text.replace("\u00a0", " ").strip("\r\n").split("\n")
+        non_empty = [l for l in lines if l.strip()]
+        if non_empty:
+            min_indent = min(len(l) - len(l.lstrip(" \t")) for l in non_empty)
+            lines = [l[min_indent:].rstrip() if l.strip() else "" for l in lines]
+        cleaned = "\n".join(lines)
+        return f"\n```\n{cleaned}\n```\n\n"
+
     def convert_p(self, el, text, parent_tags):
         classes = _classes(el)
         if "Code" in classes:
