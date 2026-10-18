@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 from pathlib import Path
 from selectolax.parser import HTMLParser
@@ -14,6 +15,7 @@ from .toc import (
     _looks_like_topic_path,
 )
 from .converter import (
+    FlareMarkdownConverter,
     ImageProcessingState,
     convert_topic_body,
     preclean_html_text,
@@ -134,15 +136,13 @@ class TestMadCapConverter(unittest.TestCase):
         self.assertIn("Missing", body.text())
 
     def test_convert_topic_body_strips_code_snippet_toolbar_and_line_numbers(self):
-        import tempfile
-
         html = """<!DOCTYPE html>
 <html><body><div id="mc-main-content">
     <h1>Topic Title</h1>
     <div class="Example">
         <div class="codeSnippet">
             <a class="codeSnippetCopyButton" role="button" href="javascript:void(0);">Copy</a>
-            <div class="codeSnippetCaption">Example</div>
+            <div class="codeSnippetCaption"><p>Example</p></div>
             <div class="codeSnippetBody" data-mc-continue="False" data-mc-line-number-start="1" data-mc-use-line-numbers="True"><pre><span class="codeSnippetLineNumbers" style="border-right: #AAA 2px solid;" aria-hidden="true">1
 2
 3
@@ -159,13 +159,34 @@ class TestMadCapConverter(unittest.TestCase):
             topic.write_text(html, encoding="utf-8")
 
             md = convert_topic_body(topic, root, {}, ImageProcessingState(), "strip")
-            self.assertNotIn("Copy", md)
-            self.assertNotIn("1\n2", md)
-            self.assertNotIn("\u00a0", md)
             self.assertEqual(
                 md,
                 "Example\n\n```\npublic class ExampleApi\n{\n    public void Build() { }\n}\n```",
             )
+
+    def test_convert_pre_handles_empty_mixed_indent_and_code_language(self):
+        conv = FlareMarkdownConverter(heading_style="ATX")
+        self.assertEqual(conv.convert("<pre></pre>").strip(), "")
+        self.assertEqual(conv.convert("<pre>   \n  \n</pre>").strip(), "")
+
+        # Mixed tab and space prefixes share no common whitespace prefix and must not be mangled
+        mixed = conv.convert("<pre><code>\ta\n    b</code></pre>").strip()
+        self.assertEqual(mixed, "```\n\ta\n    b\n```")
+
+        # Honors code_language and code_language_callback options
+        conv_lang = FlareMarkdownConverter(heading_style="ATX", code_language="csharp")
+        self.assertEqual(
+            conv_lang.convert("<pre><code>var x = 1;</code></pre>").strip(),
+            "```csharp\nvar x = 1;\n```",
+        )
+        conv_cb = FlareMarkdownConverter(
+            heading_style="ATX",
+            code_language_callback=lambda el: "vb" if el else None,
+        )
+        self.assertEqual(
+            conv_cb.convert("<pre><code>Dim x As Integer</code></pre>").strip(),
+            "```vb\nDim x As Integer\n```",
+        )
 
 class TestMarkdownValidation(unittest.TestCase):
     def test_validate_markdown_syntax_valid(self):
