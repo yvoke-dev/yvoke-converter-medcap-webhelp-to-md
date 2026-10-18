@@ -7,6 +7,7 @@ import hashlib
 import os
 import re
 import shutil
+import textwrap
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -214,6 +215,17 @@ def _classes(el) -> list[str]:
 
 class FlareMarkdownConverter(MarkdownConverter):
     """markdownify converter tuned for MadCap Flare quirks."""
+    def convert_pre(self, el, text, parent_tags):
+        if not text or not text.strip():
+            return ""
+        code_language = self.options["code_language"]
+        if self.options["code_language_callback"]:
+            code_language = self.options["code_language_callback"](el) or code_language
+        dedented = textwrap.dedent(text.replace("\u00a0", " ").strip("\r\n"))
+        lines = [l.rstrip() if l.strip() else "" for l in dedented.split("\n")]
+        cleaned = "\n".join(lines)
+        return f"\n```{code_language}\n{cleaned}\n```\n\n"
+
     def convert_p(self, el, text, parent_tags):
         classes = _classes(el)
         if "Code" in classes:
